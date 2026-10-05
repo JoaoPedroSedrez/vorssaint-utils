@@ -329,6 +329,12 @@ enum NotchAgentTests {
         _ = feed(claudeAssistant(id: "msg_6", request: "req_6", stop: "tool_use"))
         _ = feed(line(#"{"type":"user","timestamp":"2026-09-21T23:43:00.000Z","message":{"content":[{"type":"tool_result","content":"\"toolEndsTurn\":true"}]},"toolEndsTurn":false}"#))
         suite.expect(store.live.count == 1, "a tool result quoting the marker keeps the turn working")
+        // A subagent's own turn-ending tool, and a structured tool result
+        // that holds the marker deeper down, both leave the main turn open.
+        _ = feed(line(#"{"type":"user","isSidechain":true,"timestamp":"2026-09-21T23:43:01.000Z","message":{"content":[{"type":"tool_result","content":"done"}]},"toolEndsTurn":true}"#))
+        suite.expect(store.live.count == 1, "a subagent's turn-ending tool keeps the main turn working")
+        _ = feed(line(#"{"type":"user","timestamp":"2026-09-21T23:43:02.000Z","message":{"content":[{"type":"tool_result","content":"ok"}]},"toolUseResult":{"result":{"toolEndsTurn":true}}}"#))
+        suite.expect(store.live.count == 1, "a marker nested in a structured tool result keeps the turn working")
         _ = feed(line(#"{"type":"user","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}"#))
         _ = feed(claudeUser())
         suite.expect(feed(claudeAssistant(id: "msg_4", request: "req_4", model: "<synthetic>", stop: "stop_sequence",
