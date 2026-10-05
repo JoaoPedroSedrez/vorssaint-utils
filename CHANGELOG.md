@@ -92,6 +92,7 @@ Dynamic Island adds a companion, an integrated Command Bar and Watch, while AI A
 - Lyrics are also found for songs whose player reports no album. The timing adjustment buttons are easier to click.
 - A Dynamic Island opened by hover now closes when the pointer leaves quickly past one of its floating buttons, such as the music button below it, instead of staying open until the pointer comes back.
 - The closed Dynamic Island no longer stays enlarged after the pointer passes over it quickly, such as on the way to a display above it.
+- With Open on hover selected, Dynamic Island waits at its resting size for the configured delay and opens directly, without first playing the hover preview animation. Leaving and returning starts the full delay again, even when AppKit misses the tracking exit. Thanks to fuck713 for the report.
 - When Dynamic Island opens on a click, a click at the top edge of the screen while the island grows under the pointer now opens it instead of doing nothing.
 - With Keyboard navigation on in System Settings, clicking Dynamic Island no longer leaves a focus ring around the camera.
 - The AI Agents page shows the 5-hour session renewing five hours after its first request, as the provider's usage page does, instead of up to an hour later.
