@@ -201,15 +201,30 @@ final class NotchLockScreenService {
     }
 
     private static func fadeOut(_ panel: NSPanel, after delay: TimeInterval, completion: @escaping () -> Void) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.2
-                panel.animator().alphaValue = 0
-            }, completionHandler: {
-                panel.orderOut(nil)
-                completion()
-            })
+        let duration: TimeInterval = 0.2
+        let fade = {
+            // AppKit steps its fades on the main thread, which the island
+            // coming back holds as the Mac unlocks, so the player could stay
+            // over the desktop for a second. The window server fades on its own,
+            // once a fade-in AppKit may still be stepping stops where it is.
+            panel.alphaValue = panel.alphaValue
+            if NotchWindowServerFade.fadeOut(panel, duration: duration) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                    panel.alphaValue = 0
+                    panel.orderOut(nil)
+                    completion()
+                }
+            } else {
+                NSAnimationContext.runAnimationGroup({ context in
+                    context.duration = duration
+                    panel.animator().alphaValue = 0
+                }, completionHandler: {
+                    panel.orderOut(nil)
+                    completion()
+                })
+            }
         }
+        if delay > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: fade) } else { fade() }
     }
 
     private static func makePanel<Content: View>(frame: CGRect, interactive: Bool = false,
@@ -235,6 +250,29 @@ final class NotchLockScreenService {
         panel.contentView = host
         panel.setFrame(frame, display: false)
         return panel
+    }
+}
+
+/// A fade the window server runs by itself, whatever the main thread is
+/// doing. The symbols are resolved at runtime. Without them AppKit fades.
+private enum NotchWindowServerFade {
+    private typealias AlphaFunction = @convention(c) (UInt32, UnsafePointer<UInt32>, Int32, Float, Float) -> Int32
+
+    private static let bridge: (connection: UInt32, setAlpha: AlphaFunction)? = {
+        func symbol(_ name: String) -> UnsafeMutableRawPointer? {
+            dlsym(UnsafeMutableRawPointer(bitPattern: -2) /* RTLD_DEFAULT */, name)
+        }
+        guard let main = symbol("CGSMainConnectionID"), let alpha = symbol("CGSSetWindowListAlpha") else { return nil }
+        let connection = unsafeBitCast(main, to: (@convention(c) () -> UInt32).self)()
+        guard connection != 0 else { return nil }
+        return (connection, unsafeBitCast(alpha, to: AlphaFunction.self))
+    }()
+
+    /// Whether the window server took the fade.
+    static func fadeOut(_ window: NSWindow, duration: TimeInterval) -> Bool {
+        guard let bridge, window.windowNumber > 0 else { return false }
+        var id = UInt32(window.windowNumber)
+        return bridge.setAlpha(bridge.connection, &id, 1, 0, Float(duration)) == 0
     }
 }
 
